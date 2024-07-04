@@ -19,7 +19,7 @@ asst_path = os.path.join(os.getcwd(), "assets")
 app = dash.Dash(
     __name__,
     # meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
-    assets_folder=asst_path
+    # assets_folder=asst_path,
 )
 app.title = "Event Attendance Safety Levels"
 server = app.server
@@ -37,8 +37,9 @@ def build_banner():
                 id="banner-text",
                 children=[
                     html.H5(app.title),
-                    html.H6("Integrated Display of Covid & Influenze in the U.S."),
+                    html.H6("Integrated Display of Covid & Influenze in the U.S. by Event"),
                 ],
+                style={"textAlign":"center"},
             ),
             html.Div(
                 id="banner-logo",
@@ -48,6 +49,7 @@ def build_banner():
                         href="",
                     ),
                 ],
+                style={"textAlign":"center"},
             ),
         ],
     )
@@ -91,21 +93,23 @@ def build_tabs():
 def build_eventid_input():
     return html.Div(
         children=[
+        html.Div(
+            id="banner-event-id",
+            children=["Event ID Input"],
+        ),
         dcc.Input(
             id="event-id",
             className="input",
             type="text",
-            placeholder="Type in EventID here...",
-            debounce=True
-        ),
-        dcc.Dropdown(
-            id="ticket-api",
-            options=["Ticket Master", "Live Nation"],
+            placeholder="Type in Event Brite EventID here...",
+            debounce=True,
+            
         ),
         html.Div(
-            html.Button('Submit', id="submit-event-button", n_clicks=0)
-        )
-        ]
+            html.Button('Submit', id="submit-event-button", n_clicks=0),
+        ),
+        ],
+        className="inputEvent",
     )
 
 def build_state_input():
@@ -133,63 +137,82 @@ def build_state_input():
     )
 
 def build_covid_panel():
-    return html.Div(
-        id="event-info",
-        className="row",
-        children=[
-            html.Div(
-                id="card-1",
+    return html.Div([
+        html.Div(
+            id="event-info-cases",
+            className="panelCovid",
+            style={"justifyContent": "center"},
+            children=[
+                html.Div(
+                id="led-1",
                 children=[
                     html.P("Current Cases"),
                     daq.LEDDisplay(
                         id="led-covid-cases",
-                        value="0000",
-                        color="#92e0d3",
-                        backgroundColor="#1e2130",
+                        value="000000",
+                        color="#FFFF00",
+                        backgroundColor="#000000",
                         size=50,
-                    ),
-                ],
-            ),
-            html.Div(
-                id="card-1",
-                children=[
-                    html.P("Current Deaths"),
-                    daq.LEDDisplay(
-                        id="led-covid-deaths",
-                        value="0000",
-                        color="#92e0d3",
-                        backgroundColor="#1e2130",
-                        size=50,
-                    ),
-                ],
-            ),
-            html.Div(
-                id="gauge-1",
-                children=[
-                    html.P("Monthly Case Rate Change"),
-                    daq.Gauge(
-                        id="gauge-covid-cases",
-                        max=300,
-                        min=0,
-                        showCurrentValue=True,  # default size 200 pixel
-                        units="%"
-                    ),
-                ],
-            ),
-            html.Div(
-                id="gauge-2",
-                children=[
-                    html.P("Monthly Death Rate Change"),
-                    daq.Gauge(
-                        id="gauge-covid-deaths",
-                        max=300,
-                        min=0,
-                        showCurrentValue=True,  # default size 200 pixel
-                        units="%"
-                    ),
-                ],
-            ),
-        ],
+                        ),
+                    ],
+                    style={"display":"inline-block"},
+                ),
+                html.Div(
+                    id="bar-1",
+                    children=[
+                        html.P("Monthly Case Rate Change"),
+                        daq.GraduatedBar(
+                            id="bar-covid-cases",
+                            max=300,
+                            min=-300,
+                            value=125,
+                            step=1,
+                            showCurrentValue=True,  # default size 200 pixel
+                        ),
+                    ],
+                    style={"display":"inline-block"},
+                ),
+
+            ],
+        ),
+        html.Div(
+            id="event-info-deaths",
+            className="panelCovid",
+            style={"justifyContent": "center"},
+            children=[
+                html.Div(
+                    id="led-2",
+                    children=[
+                        html.P("Current Deaths"),
+                        daq.LEDDisplay(
+                            id="led-covid-deaths",
+                            value="000000",
+                            color="#FF0000",
+                            backgroundColor="#000000",
+                            size=50,
+                            ),
+                    ],
+                    style={"display":"inline-block"},
+                ),
+                html.Div(
+                    id="bar-2",
+                    children=[
+                        html.P("Monthly Death Rate Change"),
+                        daq.GraduatedBar(
+                            id="bar-covid-deaths",
+                            max=300,
+                            min=-300,
+                            value=125,
+                            step=1,
+                            showCurrentValue=True,
+                        ),
+                    ],
+                    style={"display":"inline-block"},
+                ),
+            ],
+        ),
+    ],
+    style={"display": "flex", "align-items":"center"}
     )
 
 def build_faq_tab():
@@ -249,10 +272,6 @@ def render_tab_content(tab_switch):
                     html.Div(
                         id="input-panel",
                         children=[
-                            html.Div(
-                                id="banner-event-id",
-                                children=["Event ID Input"]
-                            ),
                             build_eventid_input(),
                         ],
                     ),
@@ -335,8 +354,8 @@ def render_tab_content(tab_switch):
             Output("submit-event-button", "n_clicks"),
             Output("led-covid-cases", "value"),
             Output("led-covid-deaths", "value"),
-            Output("gauge-covid-cases", "value"),
-            Output("gauge-covid-deaths", "value")
+            Output("bar-covid-cases", "value"),
+            Output("bar-covid-deaths", "value")
             ],
     inputs=[Input("submit-event-button", "n_clicks")],
     state=[
