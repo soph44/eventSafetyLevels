@@ -1,10 +1,8 @@
 package com.sunshine;
-
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.BufferedReader;
@@ -12,32 +10,27 @@ import java.io.FileReader;
 import java.lang.InterruptedException;
 import java.net.URI;
 import java.text.SimpleDateFormat;
-import java.time.Year;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
-// import java.io.FileWriter;
-// import org.json.simple.JSONObject;
-// import com.google.gson.Gson;
-// import com.google.gson.GsonBuilder;
 import java.util.List;
-
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-
 import java.util.Calendar;
-
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.Bucket;
-import com.google.gson.Gson;
-import com.google.gson.stream.JsonReader;
 
+/**
+ * Main method creates the AWS S3 client connection and checks that the buckets exists or creates them
+ * Make calls to a COVID database API and a FLU database API.
+ * Pushes today's (Covid) or this week's (Flu) data to AWS S3.
+ * Covid API https://disease.sh/docs/#/COVID-19%3A%20JHUCSSE/get_v3_covid_19_historical_usacounties__state_
 
+*/
 public class extractToS3{
     final static String baseUrlCovid = "https://disease.sh/v3/covid-19/historical/usacounties/";
     final static String baseUrlFlu = "https://api.delphi.cmu.edu/epidata/fluview/";
@@ -63,6 +56,8 @@ public class extractToS3{
                 System.out.println("::" + bucketName + "Bucket Doesn't Exists! Initializing Bucket!");
             } catch (AmazonS3Exception e) {
                 System.err.println(e.getErrorMessage());
+                e.printStackTrace();
+                System.exit(1);
             }
            }
     }
@@ -73,7 +68,7 @@ public class extractToS3{
         if (state.contains("_")) {
             state = state.replace("_", "%20");
         }
-        String lastDays = "1";   
+        String lastDays = "1";
         String urlCovid = baseUrlCovid + state + "?lastdays=" + lastDays;      
 
         // GET from Covid API
@@ -98,6 +93,7 @@ public class extractToS3{
                 s3.putObject(bucketName, fileKey, responseBody);
             } catch (AmazonServiceException e) {
                 System.err.println(e.getErrorMessage());
+                e.printStackTrace();
                 System.exit(1);
         }
         } catch (IOException e){
@@ -146,7 +142,7 @@ public class extractToS3{
             // PUT Flu JSON into S3 Bucket; overwrites existing if re-ran
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
             String dateStamp = dateFormat.format(new Date());
-            String fileKey = "covid/" + region + "/" + dateStamp;
+            String fileKey = "flu/" + region + "/" + dateStamp;
             System.out.println("::fileKey : " + fileKey);
             try{
                 System.out.format("::Uploading %s to S3 bucket %s...\n", fileKey, bucketName);
@@ -174,17 +170,24 @@ public class extractToS3{
         checkBucketExist(covidBucketName, s3);
         checkBucketExist(fluBucketName, s3);
         
-        BufferedReader br = new BufferedReader(new FileReader("refTables/states.csv"));
-        String line = "";  
-        String DELIMITER = ",";  
+        // Creates array list of states and the state region
         List<String[]> states = new ArrayList<>();
-        while ((line = br.readLine()) != null) {
-            String[] values = line.split(DELIMITER);
-            states.add(values);
+        try{
+            BufferedReader br = new BufferedReader(new FileReader("refTables/states.csv"));
+            String line = "";  
+            String DELIMITER = ",";  
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(DELIMITER);
+                states.add(values);
+            }
+            states.remove(0);
+            br.close();
+        } catch (IOException e){
+            e.printStackTrace();
+            System.exit(1);
         }
-        states.remove(0);
-        br.close();
         
+        // parses out api key from credentials file
         JSONParser jsonParser = new JSONParser();
         String fluApiKey = "";
         try {
@@ -193,12 +196,17 @@ public class extractToS3{
             System.out.println("::fluApiKey: " + fluApiKey);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
+            System.exit(1);
         } catch (IOException e) {
             e.printStackTrace();
+            System.exit(1);
         } catch (ParseException e) {
             e.printStackTrace();
+            System.exit(1);
         }
 
+        // loops through all states and makes API calls for COVID and FLU data
+        // pushes json responses to AWS S3
         for (String[] state : states){
             System.out.println("::State: " + state[0] + " ::Region: " + state[2]);
             loadCovidData(state[0], s3, covidBucketName);

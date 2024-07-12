@@ -3,6 +3,14 @@ from eventbrite import Eventbrite
 import requests
 import pandas as pd
 
+'''
+Provides functions for making API calls to EventBrite and Mapbox
+Functions:
+    authenticate_eventbrite
+    get_eventbrite
+    authenticate_map
+    get_map
+'''
 def authenticate_eventbrite():
     #Note, Ticketmaster calls are made with api key directly in URL, no authentification needed
     data = json.load(open('./keys/apikey.json'))
@@ -53,6 +61,14 @@ def get_eventbrite(key, eventID):
     # venueJson = json.dumps(venueData, indent=4)
 
     return eventData, venueData
+
+def authenticate_map():
+
+    return
+
+def get_map():
+
+    return
 
 if __name__ == "__main__":
     key = authenticate_eventbrite()
