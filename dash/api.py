@@ -2,6 +2,7 @@ import json
 from eventbrite import Eventbrite
 import requests
 import pandas as pd
+import logging
 
 '''
 Provides functions for making API calls to EventBrite and Mapbox
@@ -11,8 +12,11 @@ Functions:
     authenticate_map
     get_map
 '''
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='python_log.log', encoding='utf-8', level=logging.DEBUG)
+
 def authenticate_eventbrite():
-    #Note, Ticketmaster calls are made with api key directly in URL, no authentification needed
     data = json.load(open('./keys/apikey.json'))
     key = data.get('eventbrite')
 
@@ -22,8 +26,12 @@ def get_eventbrite(key, eventID):
     info = ["name", "description", "start", "end", "venue_id", "logo"]
     info_base = ["text", "text", "local", "local"]
     info_logo = ["url"]
+
     eb = Eventbrite(key)
     event = eb.get_event(eventID)
+    if 'status_code' in event:
+        logging.info("::get_eventbrite Error - ", event['status_code'], event['error_description'])
+        raise #TODO: create custom exceptions for API error codes
 
     eventData = {}
     for i in range(len(info)):
@@ -44,6 +52,11 @@ def get_eventbrite(key, eventID):
     venueUrl += venueID
     header = {"Authorization": "Bearer " + key}
     venueResponse = requests.get(venueUrl, headers=header).json()
+
+    if 'status_code' in venueResponse:
+        logging.info("::get_eventbrite Error - ", event['status_code'], event['error_description'])
+        raise #TODO: create custom exceptions for API error codes
+
     venueAddress = venueResponse['address']['localized_address_display']
     venueZipcode = venueResponse['address']['postal_code']
 
@@ -54,8 +67,8 @@ def get_eventbrite(key, eventID):
     
     venueData = {
         "address": venueAddress,
-        "zipcode": venueZipcode,
         "state": venueState,
+        "zipcode": venueZipcode,
         "county": venueCounty
         }
     # venueJson = json.dumps(venueData, indent=4)
@@ -63,16 +76,35 @@ def get_eventbrite(key, eventID):
     return eventData, venueData
 
 def authenticate_map():
+    data = json.load(open('./keys/apikey.json'))
+    key = data.get('googlemap')
+    return key
 
-    return
+def get_map(key, venueData):
 
-def get_map():
-
+    mapUrl = "https://maps.googleapis.com/maps/api/staticmap?"
+    location = ""
+    for d in venueData:
+        if d != "county":
+            location += str(venueData[d]) + ", "
+        location = location[:-2]
+    zoom = "10"
+    size = "400x400"
+    parameter = f"center={location}&format=png&zoom={zoom}&size={size}&key={key}"
+    mapUrl += parameter
+    mapResponse = requests.get(mapUrl)
+    if mapResponse.status_code != 200:
+        logging.info("::get_map Error - ", mapResponse.status_code)
+    else:
+        f = open("testmap.png", "wb")
+        f.write(mapResponse.content)
+    
     return
 
 if __name__ == "__main__":
-    key = authenticate_eventbrite()
+    ebkey = authenticate_eventbrite()
     eventID = "893792827407"
-    eventData, venueData = get_eventbrite(key, eventID)
-    print(eventData)
+    eventData, venueData = get_eventbrite(ebkey, eventID)
+    mapkey = authenticate_map()
+    get_map(mapkey, venueData)
     
