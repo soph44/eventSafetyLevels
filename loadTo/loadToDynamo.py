@@ -12,6 +12,14 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename='python_log.log', encoding='utf-8', level=logging.DEBUG)
 
+awsNames = json.load(open('./keys/awstables.json'))
+covidbucket = awsNames.get('covidbucket')
+covidtable = awsNames.get('covidtable')
+covidmonthly = awsNames.get('covidmonthly')
+flubucket = awsNames.get('flubucket')
+flutable = awsNames.get('flutable')
+flumonthlybucket = awsNames.get('flumonthly')
+
 def checkDynamoTable(tableName, keySchema, attrDef, db_client, db_resource):
     #Check if the table name already exists in DynamoDB. If not, create the table.
     logging.info("::checkDynamoTable - Checking/Creating DynamoDB table {}".format(tableName))
@@ -107,6 +115,8 @@ def putDynamoCovid(state, s3_client, tableName, bucketName):
                     err.response["Error"]["Message"]
                     )
         raise
+    
+    return status
 
 def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
     # read DynamoDB for today, 1-week ago, 2-week ago, 3-week ago
@@ -142,6 +152,8 @@ def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
                 TableName=tableName,
                 KeyConditionExpression=Key('date').eq(today)
             )
+            status = response["ResponseMetadata"]["HTTPStatusCode"]
+            print(status)
 
             #append to new array to be converted to dataframe then added to DB table
             for ln in response['Items']:
@@ -170,12 +182,12 @@ def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
             dataTemp = dataList0[i][0]
             dicts = [dataList1, dataList2, dataList3]
             for d in dicts:
-                print(d)
+                # print(d)
                 for dd in d[i]:
                     print(dd)
                     dataTemp.update(dd)
             data.append(dataTemp)
-            print(dataTemp)
+            # print(dataTemp)
 
         ds = pd.DataFrame(data, columns=cols)
         ds['monthly-case-rate'] = 0
@@ -216,6 +228,7 @@ def putDynamoFlu(s3_client, fromBucket, toTable):
             key = "flu/hhs" + str(i) + "/" + today
             fluResponse = s3_client.get_object(Bucket=fromBucket, Key=key)
             fluBytes = fluResponse['Body'].read()
+            status = fluResponse["ResponseMetadata"]["HTTPStatusCode"]
             
             # convert to dataframe, format, re-index
             data = json.loads(fluBytes)
@@ -237,7 +250,7 @@ def putDynamoFlu(s3_client, fromBucket, toTable):
     # put dataframe to DynamoDB using awswrangler
     wr.dynamodb.put_df(df=dfAllRegion, table_name=toTable)
 
-    return
+    return status
 
 def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
     # read DynamoDB for today, 1-week ago, 2-week ago, 3-week ago
@@ -282,7 +295,7 @@ def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
                     
             #append to new array to be converted to dataframe then added to DB table
             for ln in response['Items']:
-                print(ln)
+                # print(ln)
                 if t == 0:
                     dataTemp = [
                         {cols[0]: ln['region'],
@@ -307,12 +320,12 @@ def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
             dataTemp = dataList0[i][0]
             dicts = [dataList1, dataList2, dataList3]
             for d in dicts:
-                print(d)
+                # print(d)
                 for dd in d[i]:
                     print(dd)
                     dataTemp.update(dd)
             data.append(dataTemp)
-            print(dataTemp)
+            # print(dataTemp)
 
         ds = pd.DataFrame(data, columns=cols)
         ds['monthly-case-rate'] = 0
@@ -345,10 +358,10 @@ def main():
     # checkDynamoTable("covidtable", keySchema1, attrDef1, db_client, db_resource)
     # checkDynamoTable("covidmonthly", keySchema2, attrDef2, db_client, db_resource)
     testState = "alaska"
-    putDynamoCovid(state=testState, s3_client=s3_client, tableName = "covidTable", bucketName = "sunshine-covidapibucket-dev")
-    updateDynamoCovidRates(db_resource=db_resource, tableName = 'covidtable', tableNameMonthly = 'covidmonthly')
-    putDynamoFlu(s3_client = s3_client, fromBucket = "sunshine-fluapibucket-dev", toTable = 'flutable')
-    updateDynamoFluRates(db_resource, tableName = 'flutable', tableNameMonthly = 'flumonthly')
+    putDynamoCovid(state=testState, s3_client=s3_client, tableName = covidtable, bucketName = covidbucket)
+    updateDynamoCovidRates(db_resource=db_resource, tableName = covidtable, tableNameMonthly = covidmonthly)
+    putDynamoFlu(s3_client = s3_client, fromBucket = flubucket, toTable = flutable)
+    updateDynamoFluRates(db_resource, tableName = flutable, tableNameMonthly = flumonthly)
 
 if __name__ == "__main__":
     main()
