@@ -1,0 +1,65 @@
+@startuml
+
+title Dash App Callbacks & ETL Pipeline, Sequence Diagram
+
+skinparam wrapWidth 200
+skinparam maxMessageSize 200
+skinparam Shadowing false
+
+participant User
+participant "Haroku_DashApp" as dash
+participant "External_APIs" as apis
+database AWS_DynamoDB
+participant AWS_Lambda
+participant AWS_S3
+participant AWS_EC2
+database "Covid & Flu Database APIs" as cfdb
+
+' Dash App dashboard
+User [bold,#green]-> dash: Enter EventID of interest and submits callback 
+dash --> apis: Valid Authentication Request
+dash <-- apis: Authentication Response (OK)
+dash --> apis: GET Eventbrite (EventID)
+dash <-- apis: Response (200)
+rnote right apis
+**payload**
+    address, state, zipcode, county
+end note
+dash --> apis: GET Google Map (Location)
+dash <-- apis: Response (200)
+rnote right apis
+**payload**
+    location image
+end note
+dash --> AWS_DynamoDB: GET DynamoDB (Today)
+dash <-- AWS_DynamoDB: Response (200)
+rnote right AWS_DynamoDB
+**payload**
+    Covid Cases, Covid Deaths
+    Flu Cases, Flu Cases Past
+end note
+dash --> User: Displays Flu/Covid information in dash components
+
+' ETL Pipeline
+AWS_EC2 [bold,#blue]-> cfdb: Extraction.java Executes (Today, daily scheduler)
+loop through all US States
+    AWS_EC2 --> cfdb: GET (state)
+    cfdb --> AWS_EC2: Response (200)
+    rnote right cfdb
+    **payload**
+        Covid json: county, cases, deaths
+        Flu json: result, epidata[], message
+    end note
+    AWS_EC2 --> AWS_S3: PUT (bucket: /disease/state/date)
+    AWS_S3 <--> AWS_Lambda: New S3 files triggers Transformation/Loading.py
+    AWS_Lambda --> AWS_S3: GET S3 (state, today)
+    AWS_Lambda <-- AWS_S3: Response (200)
+    AWS_Lambda --> AWS_DynamoDB: PUT (state)
+    rnote right AWS_Lambda
+    **payload**
+        Covid json: county, cases, deaths, change rate
+        Flu json: epidata[region, num_ili, num_patients, wili, ili]
+    end note
+end loop
+
+@enduml
