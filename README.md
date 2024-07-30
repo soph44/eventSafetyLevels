@@ -64,4 +64,4 @@ TBD instructions on setup
 
 ## Example Dashboard
 
-![Example Dashboard](misc/example_dashboard.png)
+![Example Dashboard](misc/example_dash.png)
