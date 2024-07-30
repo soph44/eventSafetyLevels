@@ -1,0 +1,69 @@
+
+{
+    "covidKey" : 
+        [{
+            "AttributeName": "date",
+            "KeyType": "HASH"  
+        },
+        {
+            "AttributeName": "state-county",
+            "KeyType": "RANGE"  
+        }],
+    "covidAttr" : 
+        [{
+            "AttributeName": "date",
+            "AttributeType": "S"  
+        },
+        {
+            "AttributeName": "state-county",
+            "AttributeType": "S"  
+        }],
+    "covidMonthKey" : 
+        [{
+            "AttributeName": "state-county",
+            "KeyType": "HASH" 
+        },
+        {
+            "AttributeName": "state",
+            "KeyType": "range" 
+        }
+    
+        ],
+    "covidMonthAttr" : 
+        [{
+            "AttributeName": "state-county",
+            "AttributeType": "S" 
+        },
+        {
+            "AttributeName": "state",
+            "AttributeType": "S" 
+        }],
+    "fluKey" : 
+        [{
+            "AttributeName": "date",
+            "KeyType": "HASH"  
+        },
+        {
+            "AttributeName": "region",
+            "KeyType": "RANGE"  
+        }],
+    "fluAttr" : 
+        [{
+            "AttributeName": "date",
+            "AttributeType": "S"  
+        },
+        {
+            "AttributeName": "region",
+            "AttributeType": "S"  
+        }],
+    "fluMonthKey" : 
+        [{
+            "AttributeName": "region",
+            "KeyType": "HASH" 
+        }],
+    "fluMonthAttr" : 
+        [{
+            "AttributeName": "region",
+            "AttributeType": "S" 
+        }]
+}

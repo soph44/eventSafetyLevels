@@ -1,0 +1,9 @@
+{
+    "covidbucket": "sunshine-covidapibucket-dev",
+    "covidtable": "covidtable",
+    "covidmonthlytable": "covidmonthly",
+    "flubucket": "sunshine-fluapibucket-dev",
+    "flutable": "flutable",
+    "flumonthlytable": "flumonthly"
+
+}

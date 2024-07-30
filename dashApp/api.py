@@ -28,8 +28,8 @@ def get_eventbrite(key, eventID):
     info_logo = ["url"]
 
     eb = Eventbrite(key)
-    event = eb.get_event(eventID)
-    print(event)
+    event = eb.get_event(str(eventID))
+    # print(event)
     if 'status_code' in event:
         status = event['status_code']
         logging.info("::get_eventbrite Error - ", status, event['error_description'])
@@ -48,7 +48,7 @@ def get_eventbrite(key, eventID):
         if (i == 5):
             item = {info[i]:event[info[i]][info_logo[0]]}
             eventData.update(item)
-    # eventJson = json.dumps(eventData, indent=4)
+    # print(eventData)
 
     #Venue endpoint not available in Python SDK
     venueID = eventData['venue_id']
@@ -75,7 +75,6 @@ def get_eventbrite(key, eventID):
         "zipcode": venueZipcode,
         "county": venueCounty
         }
-    # venueJson = json.dumps(venueData, indent=4)
 
     return eventData, venueData, status
 
@@ -88,26 +87,32 @@ def get_map(key, venueData):
 
     mapUrl = "https://maps.googleapis.com/maps/api/staticmap?"
     location = ""
-    for d in venueData:
-        if d != "county":
-            location += str(venueData[d]) + ", "
-        location = location[:-2]
+    if isinstance(venueData, dict):
+        for d in venueData:
+            if d != "county":
+                location += str(venueData[d]) + ", "
+            location = location[:-2]
+    elif isinstance(venueData, str):
+        location = venueData
+    
     zoom = "10"
     size = "400x400"
     parameter = f"center={location}&format=png&zoom={zoom}&size={size}&key={key}"
     mapUrl += parameter
     mapResponse = requests.get(mapUrl)
+    status = mapResponse.status_code
     if mapResponse.status_code != 200:
         logging.info("::get_map Error - ", mapResponse.status_code)
     else:
-        f = open("testmap.png", "wb")
-        f.write(mapResponse.content)
+        # f = open("testmap.png", "wb")
+        # f.write(mapResponse.content)
+        img = mapResponse.content
     
-    return mapResponse.status_code
+    return img, status
 
 if __name__ == "__main__":
     ebkey = authenticate_eventbrite()
     eventID = "893792827407"
-    eventData, venueData = get_eventbrite(ebkey, eventID)
+    eventData, venueData, status = get_eventbrite(ebkey, eventID)
     mapkey = authenticate_map()
     get_map(mapkey, venueData)

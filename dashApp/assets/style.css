@@ -1,22 +1,57 @@
 body {
     font-family: sans-serif;
-    background-color: grey;
+    background-color: rgb(223, 223, 223);
 }
-h1, h2, h3, h4, h5, h6 {
-    color: rgb(0, 140, 255);
-}
-row{
-    color: rgb(49, 108, 135);
-    border: 2px solid rgba(0, 139, 139, 0.361);
+.banner{
+    font-family: sans-serif;
+    color:rgb(49, 108, 135);
 }
 .inputEvent{
-    border: 2px solid green;
-    color: rgb(50, 165, 123);
+    border: 3px solid rgb(0, 41, 128);
+    background-color: rgb(231, 231, 231);
+    color: rgb(49, 108, 135);
+    width:96vw;
 }
 .panelCovid{
-    border: 2px solid green;
-    color: rgb(165, 50, 50);
-    background-color: rgb(32, 32, 32);
+    border: 3px solid rgb(0, 41, 128);
+    color: rgb(49, 108, 135);
+    background-color: rgb(231, 231, 231);
     margin: 2px;
     text-align: center;
+    display: inline-block;
+    justify-content: center;
+}
+.panelFlu{
+    border: 3px solid rgb(0, 41, 128);
+    color: rgb(49, 108, 135);
+    background-color: rgb(231, 231, 231);
+    margin: 2px;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+}
+.panelLED{
+    display:inline-block;
+    width:47.5vw;
+    align-items:center;
+}
+.panelMap{
+    border: 3px solid rgb(0, 41, 128);
+    color: rgb(49, 108, 135);
+    background-color: rgb(231, 231, 231);
+    margin: 2px;
+    text-align: center;
+    width:96vw;
+}
+.panelInfo{
+    border: 3px solid rgb(0, 41, 128);
+    color: rgb(49, 108, 135);
+    background-color: rgb(231, 231, 231);
+    margin: 2px;
+    text-align: center;
+    justify-content: center;
+    width:96vw;
+}
+.panelLabel{
+    color: rgb(49, 108, 135);
 }

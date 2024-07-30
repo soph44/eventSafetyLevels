@@ -1,0 +1,51 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Component Diagram
+skinparam wrapWidth 200
+skinparam maxMessageSize 200
+
+'LAYOUT_WITH_LEGEND()
+
+Person_Ext(user, "User", "User inputs <u><b>EventID</b></u> of interest")
+
+'Dash webapp
+System_Boundary(webapp, "Dash WebApp"){
+    Container(info, "Disease Info", "Covid and Influenza for specified Event ID location/date")
+    Container(ui, "Dash/Flask UI", "Displayed information for EventID")
+    Container(agg, "Aggregator", "Requests Data and prepares Dash charts")
+}
+
+'External APIs
+System_Boundary(api, "External APIs (Ticketmaster, Eventbrite, Map)"){
+    Container(eb, "EventBrite","Provides [location] and [event info]")
+    Container(map, "Google Static Maps API","Provides [static map] of city/location")
+}
+
+'AWS backend and pipeline
+System_Boundary(aws, "Backend AWS Data Pipeline"){
+    Container(dynamo, "NoSQL Table", "AWS: DynamoDB", "Cleaned and appended data ready for querying")
+    Container(py_script, "Transform Script", "AWS: Lambda", "Tiggered Lambda function (Python) to clean, transform, append, and put data into DynamoDB")
+    Container(sss, "Datalake", "AWS: S3", "Raw extracted data from varying sources")
+    Container(java_script, "Extract Script", "AWS: EC2 & TBD Scheduler Java", "EC2 hosted Java program to extract data from various sources and formats into S3.")
+
+    ContainerDb(data_flu, "Flu Datasource", "Delphi Epidata API", "Regional Influenza data sourced from CDC")
+    ContainerDb(data_covid, "Covid Datasource", "Disease.sh API ", "County level COVID data sourced from John Hopkins")
+}
+
+
+' fight the layout engine
+'auth -[hidden]right-> shop
+'skinparam linetype ortho
+BiRel_R(user, ui, "Input <b>EventID</b>", "Ticketmaster OR Eventbrite")
+Rel(ui, agg,"Provides \n var: eventID, \n var: currentWeek")
+Rel(agg, ui,"Updates Dash objects")
+BiRel(agg, info, "Provides [location] & [currentWeek]", "Returns Dataframe")
+BiRel(agg, api, "Sends GET requests to APIs", "Returns event [location]")
+BiRel(dynamo, info, "Queries DynamoDB tables on [location] & [currentWeek]")
+Rel_L(data_flu, java_script,)
+Rel_R(data_covid, java_script,)
+Rel_U(java_script, sss, )
+Rel_L(sss, py_script, )
+Rel_L(py_script, dynamo, )
+@enduml

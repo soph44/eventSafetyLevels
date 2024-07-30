@@ -1,27 +1,61 @@
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from boto3.dynamodb.conditions import Key, Attr
+from boto3.dynamodb.conditions import Key
 import json
 from datetime import datetime, timedelta
-import numpy as np
 import pandas as pd
 import awswrangler as wr
 import logging
+import time
+
+'''
+File: loadToDynamo.py
+Author: SonnyP
+Functions for reading from S3 buckets and putting cleaned/transformed data into DynamoDB tables.
+Functions:
+    connectAWS
+    checkDynamoTable
+        checkAllTables
+    putDynamoCovid
+    updateDynamoCovidRates
+    putDynamoFlu
+    updateDynamoFluRates
+'''
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename='python_log.log', encoding='utf-8', level=logging.DEBUG)
 
-awsNames = json.load(open('./keys/awstables.json'))
+#Load tablenames from awstables.json
+awsNames = json.load(open('./loadTo/awstables.json'))
 covidbucket = awsNames.get('covidbucket')
 covidtable = awsNames.get('covidtable')
-covidmonthly = awsNames.get('covidmonthly')
+covidmonthly = awsNames.get('covidmonthlytable')
 flubucket = awsNames.get('flubucket')
 flutable = awsNames.get('flutable')
-flumonthlybucket = awsNames.get('flumonthly')
+flumonthly = awsNames.get('flumonthlytable')
 
+#Creates connection to AWS and creates S3 and DynamoDB resources
+def connectAWS(region):
+    
+    logger.info("::connectAWS - Creating AWS connection and resources")
+    try:
+        s3_client = boto3.client('s3')
+        db_client = boto3.client('dynamodb')
+        db_resource = boto3.resource('dynamodb', region_name=region)
+    except ClientError as err:
+        logger.error("::Couldn't connect to AWS S3 and/or DynamoDB...\n",
+                    err.response["Error"]["Code"], \
+                    err.response["Error"]["Message"]
+                    )
+        raise
+    logging.info(f"::connectAWS successful")
+
+    return (s3_client, db_client, db_resource)
+
+#Check if the table name already exists in DynamoDB. If not, create the table.
 def checkDynamoTable(tableName, keySchema, attrDef, db_client, db_resource):
-    #Check if the table name already exists in DynamoDB. If not, create the table.
+    
     logging.info("::checkDynamoTable - Checking/Creating DynamoDB table {}".format(tableName))
 
     try:
@@ -59,32 +93,26 @@ def checkDynamoTable(tableName, keySchema, attrDef, db_client, db_resource):
 
     return tableFound
 
-def connectAWS(region):
-    #Creates connection to AWS and creates S3 and DynamoDB resources
-    logger.info("::connectAWS - Creating AWS connection and resources")
-    try:
-        s3_client = boto3.client('s3')
-        db_client = boto3.client('dynamodb')
-        db_resource = boto3.resource('dynamodb', region_name=region)
-    except ClientError as err:
-        logger.error("::Couldn't connect to AWS S3 and/or DynamoDB...\n",
-                    err.response["Error"]["Code"], \
-                    err.response["Error"]["Message"]
-                    )
-        raise
+#Calls checkDynamoTable for all necessary tables. For use in table initialization.
+def checkAllTables(db_client, db_resource):
+    f = open("./assets/tableSchema.json")
+    data = json.load(f)
+    checkDynamoTable("testtable", data['fluKey'], data['fluAttr'], db_client, db_resource)
+    checkDynamoTable("flumonthly", data['fluMonthKey'], data['fluMonthAttr'], db_client, db_resource)
+    checkDynamoTable("covidtable", data['covidKey'], data['covidAttr'], db_client, db_resource)
+    checkDynamoTable("covidmonthly", data['covidMonthKey'], data['covidMonthAttr'], db_client, db_resource)
 
-    #return S3 client, DynamoDB Client and Resource
-    return (s3_client, db_client, db_resource)
-
+# Reads from S3 bucket (from today) and transforms/puts data into DynamoDB Covid table
 def putDynamoCovid(state, s3_client, tableName, bucketName):
-    # Reads from S3 bucket (from today) and transforms/puts data into DynamoDB Covid table
     logger.info("::putDynamoCovid for {}".format(state))
 
     # read S3 objects put today
     today = datetime.today().strftime('%Y-%m-%d')
     lastDays = "1"
+    state = state.replace("_", "%20")
     covidPrefix = 'covid/' + state + '/'
     key = covidPrefix + today + "_last" + lastDays
+    logger.info("::putDynamoCovid object key {key}")
 
     try:
         response = s3_client.get_object(Bucket=bucketName, Key=key)
@@ -114,14 +142,16 @@ def putDynamoCovid(state, s3_client, tableName, bucketName):
                     err.response["Error"]["Code"], \
                     err.response["Error"]["Message"]
                     )
+
         raise
     
     return status
 
+#Read DynamoDB for today, 1-week ago, 2-week ago, 3-week ago
+#Update covidmonthly table for each county with covid rate data
 def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
-    # read DynamoDB for today, 1-week ago, 2-week ago, 3-week ago
-    # update covidmonthly table for each county with covid rate data
     logger.info(f"::updateDynamoCovidRates Table1:{tableName}, Table2:{tableNameMonthly}")
+
     try:
         table = db_resource.Table(tableName)
 
@@ -147,13 +177,14 @@ def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
                 TableName=tableName,
                 KeyConditionExpression=Key('date').eq(pastWeeks[t])
             )
+            #For testing purposes, if there is no data for iterated date, use today's instead
             if response['Count'] == 0:
                 response = table.query(
                 TableName=tableName,
                 KeyConditionExpression=Key('date').eq(today)
             )
             status = response["ResponseMetadata"]["HTTPStatusCode"]
-            print(status)
+            logging.info(f"::DynamoDB updateDynamoCovidDates past week: {pastWeeks[t]}, status: {status}")
 
             #append to new array to be converted to dataframe then added to DB table
             for ln in response['Items']:
@@ -184,10 +215,9 @@ def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
             for d in dicts:
                 # print(d)
                 for dd in d[i]:
-                    print(dd)
+                    # print(dd)
                     dataTemp.update(dd)
             data.append(dataTemp)
-            # print(dataTemp)
 
         ds = pd.DataFrame(data, columns=cols)
         ds['monthly-case-rate'] = 0
@@ -196,11 +226,12 @@ def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
         # perform calculations to create case/death rates for each country
         for index, row in ds.iterrows():
             if row['cases-week3'] != 0:
-                ds.at[index, 'monthly-case-rate'] = (row['cases-today'] - row['cases-week3']) / row['cases-week3']
+                ds.at[index, 'monthly-case-rate'] = round((row['cases-today'] - row['cases-week3']) / row['cases-week3'], 2) * 100
             if row['deaths-week3'] != 0:
-                ds.at[index, 'monthly-death-rate'] = (row['deaths-today'] - row['deaths-week3']) / row['deaths-week3']
+                ds.at[index, 'monthly-death-rate'] = round((row['deaths-today'] - row['deaths-week3']) / row['deaths-week3'], 2) * 100
         
         #Put data into Monthly Covid Rate table
+        ds.to_csv("test_write_size.csv")
         wr.dynamodb.put_df(df=ds, table_name=tableNameMonthly)
 
     except ClientError as err:
@@ -209,11 +240,12 @@ def updateDynamoCovidRates(db_resource, tableName, tableNameMonthly):
                     err.response["Error"]["Message"]
                     )
         raise
-
+    
     return
 
+#Read S3 objects for each US region and put into DynamoDB Table
+#Regions are listed as hhs1 through hhs10
 def putDynamoFlu(s3_client, fromBucket, toTable):
-    #Read S3 objects for each US region and put into DynamoDB Table
     logger.info(f"::putDynamoFlu from S3 bucket: {fromBucket} to AWS table: {toTable}")
 
     # read S3 objects put today
@@ -252,9 +284,10 @@ def putDynamoFlu(s3_client, fromBucket, toTable):
 
     return status
 
+#Read DynamoDB for today, 1-week ago, 2-week ago, 3-week ago
+#Update covidmonthly table for each county
 def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
-    # read DynamoDB for today, 1-week ago, 2-week ago, 3-week ago
-    # update covidmonthly table for each county
+    
     table = db_resource.Table(tableName)
 
     cols = ['region',
@@ -287,15 +320,17 @@ def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
                 TableName=tableName,
                 KeyConditionExpression=Key('date').eq(pastWeeks[t])
             )
+            #For testing purposes, if there is no data for iterated date, use today's instead
             if response['Count'] == 0:
                     response = table.query(
                     TableName=tableName,
                     KeyConditionExpression=Key('date').eq(today)
                 )
-                    
+            status = response["ResponseMetadata"]["HTTPStatusCode"]
+            logging.info(f"::DynamoDB updateDynamoCovidDates past week: {pastWeeks[t]}, status: {status}")
+
             #append to new array to be converted to dataframe then added to DB table
             for ln in response['Items']:
-                # print(ln)
                 if t == 0:
                     dataTemp = [
                         {cols[0]: ln['region'],
@@ -320,20 +355,21 @@ def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
             dataTemp = dataList0[i][0]
             dicts = [dataList1, dataList2, dataList3]
             for d in dicts:
-                # print(d)
                 for dd in d[i]:
-                    print(dd)
+                    # print(dd)
                     dataTemp.update(dd)
             data.append(dataTemp)
-            # print(dataTemp)
 
         ds = pd.DataFrame(data, columns=cols)
-        ds['monthly-case-rate'] = 0
+        ds['today-case-rate'] = 0
+        ds['week3-case-rate'] = 0
 
         # perform calculations to determine case rates
         for index, row in ds.iterrows():
-            if row['week3-num_ili'] != 0:
-                ds.at[index, 'monthly-case-rate'] = (row['today-num_ili'] - row['week3-num_ili']) / row['week3-num_ili']
+            if row['week3-case-rate'] != 0:
+                ds.at[index, 'week3-case-rate'] = row['week3-num_ili'] / row['week3-num_patients']
+            if row['today-case-rate'] != 0:
+                ds.at[index, 'today-case-rate'] = row['today-num_ili'] / row['today-num_patients']
         
         # put new dataframe into flu rate DB table
         wr.dynamodb.put_df(df=ds, table_name=tableNameMonthly)
@@ -347,20 +383,22 @@ def updateDynamoFluRates(db_resource, tableName, tableNameMonthly):
 
     return
 
+
 def main():
     # connect S3 and dynamoDB, check dynamoDB table exists or create
     s3_client, db_client, db_resource = connectAWS(region="us-east-2")
-    # check necessary tables exist or initiate creation if not
-    # f = open("./loadTo/tableSchema.json")
-    # data = json.load(f)
-    # checkDynamoTable("testtable", data['fluKey'], data['fluAttr'], db_client, db_resource)
-    # checkDynamoTable("flumonthly", keySchema2, attrDef2, db_client, db_resource)
-    # checkDynamoTable("covidtable", keySchema1, attrDef1, db_client, db_resource)
-    # checkDynamoTable("covidmonthly", keySchema2, attrDef2, db_client, db_resource)
-    testState = "alaska"
-    putDynamoCovid(state=testState, s3_client=s3_client, tableName = covidtable, bucketName = covidbucket)
+    # checkAllTables(db_client, db_resource)
+
+    csv = pd.read_csv("./assets/statesPartial.csv") #only a few states are used for demonstration. Full list would cost too much.
+    listStates = csv['State']
+    for st in listStates:
+        putDynamoCovid(state=st, s3_client=s3_client, tableName = covidtable, bucketName = covidbucket)
+        time.sleep(5) #workaround to minimize having to increase DynamoDB privisioned units
+    time.sleep(10) #Workaround to minimize having to increase DynamoDB cost and provisioned units
     updateDynamoCovidRates(db_resource=db_resource, tableName = covidtable, tableNameMonthly = covidmonthly)
+    time.sleep(10) #Workaround to minimize having to increase DynamoDB cost and provisioned units
     putDynamoFlu(s3_client = s3_client, fromBucket = flubucket, toTable = flutable)
+    time.sleep(10) #Workaround to minimize having to increase DynamoDB cost and provisioned units
     updateDynamoFluRates(db_resource, tableName = flutable, tableNameMonthly = flumonthly)
 
 if __name__ == "__main__":

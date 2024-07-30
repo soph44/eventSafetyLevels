@@ -27,10 +27,13 @@ import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.Bucket;
 
 /**
+ * File: extractToS3.java
+ * Author: SonnyP
  * Main method creates the AWS S3 client connection and checks that the buckets exists or creates them
  * Make calls to a COVID database API and a FLU database API.
  * Pushes today's (Covid) or this week's (Flu) data to AWS S3.
- * Covid API https://disease.sh/docs/#/COVID-19%3A%20JHUCSSE/get_v3_covid_19_historical_usacounties__state_
+ * Covid API doc https://disease.sh/docs/#/COVID-19%3A%20JHUCSSE/get_v3_covid_19_historical_usacounties__state_
+ * Flu API doc https://cmu-delphi.github.io/delphi-epidata/api/fluview.html
 
 */
 public class extractToS3{
@@ -39,6 +42,7 @@ public class extractToS3{
     private static final Logger LOGGER = Logger.getLogger(extractToS3.class.getName());
 
     public static AmazonS3 connectS3Client(){
+        // Creates connection and resource for AWS S3
         LOGGER.log(Level.INFO, "::connectS3 Client Start");
         try{
             final AmazonS3 s3 = AmazonS3ClientBuilder.standard().withRegion(Regions.US_EAST_2).build();
@@ -55,6 +59,7 @@ public class extractToS3{
     }
 
     public static void checkBucketExist(String bucketName, AmazonS3 s3){
+        // Check S3 bucket exists and create if not
         
         LOGGER.log(Level.INFO, "::checkBucketExist Start: " + bucketName);
         Boolean ifExists;
@@ -163,7 +168,7 @@ public class extractToS3{
             
             HttpResponse<String> response = HttpClient.newHttpClient().send(request, BodyHandlers.ofString());
             String responseBody = response.body();
-            System.out.println(responseBody);
+            // System.out.println(responseBody);
 
             // PUT Flu JSON into S3 Bucket; overwrites existing if re-ran
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
