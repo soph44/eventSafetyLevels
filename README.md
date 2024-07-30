@@ -1,5 +1,7 @@
 # Event Safety Levels
 
+This project is still WIP
+
 ## About The Project
 
 This project was created for general programming practice. See Technology Stack for more details.
@@ -59,3 +61,7 @@ Sequence Diagram:
 ### Local or Cloud Deployment
 
 TBD instructions on setup
+
+## Example Dashboard
+
+![Example Dashboard](misc/example_dashboard.png)

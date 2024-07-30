@@ -201,7 +201,7 @@ def build_covid_panel():
                             id="bar-covid-cases",
                             max=300,
                             min=-300,
-                            value=50,
+                            value=0,
                             step=1,
                             showCurrentValue=True,  # default size 200 pixel
                         ),
@@ -239,7 +239,7 @@ def build_covid_panel():
                             id="bar-covid-deaths",
                             max=300,
                             min=-300,
-                            value=50,
+                            value=0,
                             step=1,
                             showCurrentValue=True,
                         ),
